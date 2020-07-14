@@ -18,22 +18,6 @@ namespace DiscordBot
         public static FileStream ostrm;
         public static StreamWriter writer;
         public static TextWriter stdOut;
-
-        public static readonly string welcomeMessage = "Welcome to the buddies server!\n" +
-                " Please read the rules, change your nickname to your real name and ask me for your roles!\n" +
-                "The current role commands are :\n" +
-                "   !programming:         for the programming minor\n" +
-                "   !graphics:            for the graphics minor\n" +
-                "   !pm:                  for the project management minor\n" +
-                "   !design:              for the design minor\n" +
-                "   !newcomer:            for people starting the education after the summer\n" +
-                "   !1st:                 for 1st year bachelors students\n" +
-                "   !2nd:                 for 2nd year bachelors students\n" +
-                "   !3rd:                 for 3rd year bachelors students\n" +
-                "   !4th:                 for 1st year masters students\n" +
-                "   !alumni:              for alumni\n" +
-                "You can also ask for !help if you don't remember a command!";
-
         static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
 
         private DiscordSocketClient client = new DiscordSocketClient();
@@ -59,14 +43,12 @@ namespace DiscordBot
             Console.SetOut(writer);
             Console.WriteLine(DateTime.Now);
 
-
-
             services = new ServiceCollection().AddSingleton(client).AddSingleton(commands).BuildServiceProvider();
             string token;
             try
             {
                 token = File.ReadAllText("token");
-            } catch(Exception e)
+            } catch (Exception e)
             {
                 Console.WriteLine(e.Message);
                 return;
@@ -96,14 +78,19 @@ namespace DiscordBot
             await commands.AddModuleAsync(typeof(Modules.Commands), services);
         }
 
-        private async Task HandleUserJoinedAsync(SocketGuildUser arg)
+        private async Task HandleUserJoinedAsync(SocketGuildUser user)
         {
-            if (arg.IsBot) return;
-            var ghostRole = arg.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
-            if (ghostRole != null) await arg.AddRoleAsync(ghostRole);
+            if (user.IsBot) return;
+            var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
+            if (ghostRole != null) await user.AddRoleAsync(ghostRole);
 
-            var generalChannel = client.GetChannel(441370070711533590) as SocketTextChannel;
-            await generalChannel.SendMessageAsync(welcomeMessage);
+            var DMs = await user.GetOrCreateDMChannelAsync();
+            await DMs.SendMessageAsync(
+                 $"Welcome to the **Buddies** server!\n" +
+                "Please read the rules, change your nickname to your real name and ask me for your roles!\n" +
+                "Role commands are programming, graphics, design, pm, newcomer, 1st, 2nd, 3rd, 4th and alumni\n" +
+                "You can also ask for !help if you don't remember a command!"
+            );
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
@@ -112,23 +99,16 @@ namespace DiscordBot
             var context = new SocketCommandContext(client, message);
             if (message.Author.IsBot) return;
 
-            int argPos = 0;
-            if(message.HasStringPrefix("!", ref argPos)) 
+            int argumentPosition = 0;
+            if (message.HasStringPrefix("!", ref argumentPosition) 
+                || message.HasStringPrefix("frog ", ref argumentPosition) 
+                || message.HasStringPrefix("Oh great FromgBot, ", ref argumentPosition)
+                )
             {
-                var result = await commands.ExecuteAsync(context, argPos, services);
-                if (!result.IsSuccess) 
+                var result = await commands.ExecuteAsync(context, argumentPosition, services);
+                if (!result.IsSuccess)
                 {
                     Console.WriteLine(result.ErrorReason);
-                }
-            } else
-            {
-                if (message.HasStringPrefix("frog ", ref argPos))
-                {
-                    var result = await commands.ExecuteAsync(context, argPos, services);
-                    if (!result.IsSuccess)
-                    {
-                        Console.WriteLine(result.ErrorReason);
-                    }
                 }
             }
         }

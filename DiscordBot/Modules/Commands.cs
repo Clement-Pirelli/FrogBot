@@ -76,7 +76,7 @@ namespace DiscordBot.Modules
             return true;
         }
 
-        private async Task SendChangeConfirmation()
+        private async Task SendConfirmation()
         {
             if (Emote.TryParse("<:frogthumbsup:722037848890671105>", out var emote))
             {
@@ -87,7 +87,7 @@ namespace DiscordBot.Modules
                 await Context.Message.AddReactionAsync(new Emoji("👍"));
             }
         }
-        private async Task SendChangeDenial() 
+        private async Task SendDenial() 
         {
             if (Emote.TryParse("<:frogthumbsdown:722234808327209010>", out var emote))
             {
@@ -108,7 +108,7 @@ namespace DiscordBot.Modules
             //check if the request is valid
             if (ghostRole == null || role == null || !IsValidRoleRequest(user, role)) 
             {
-                await SendChangeDenial();
+                await SendDenial();
                 return;
             }
             
@@ -125,9 +125,10 @@ namespace DiscordBot.Modules
                 await user.AddRoleAsync(role);
             }
 
-            await SendChangeConfirmation();
+            await SendConfirmation();
         }
 
+        //this is sad code but eh well.
         [Command("programming")]
         public async Task Programmer() => await ToggleRole(minorRoles[Minors.Programming]);
 
@@ -159,14 +160,15 @@ namespace DiscordBot.Modules
         [Command("alumni")]
         public async Task Alumni() => await ToggleRole(yearRoles[Years.Alumni]);
 
+
         [Command("help")]
         public async Task Help() 
         {
             await ReplyAsync(
                 "Frogbot to the rescue!\n" +
                 "All of my commands are preceded by \"!\"\n" +
-                "Minor role commands are : programming, graphics, design, pm\n" +
-                "Year role commands are: newcomer, 1st, 2nd, 3rd, 4th, alumni\n" +
+                "Role commands are programming, graphics, design, pm, newcomer, 1st, 2nd, 3rd, 4th and alumni\n" +
+                "If you can manage message, cleanup <Amount> removes Amount of my messages\n" +
                 "So far, that's about it!"
                 );
         }
@@ -193,6 +195,22 @@ namespace DiscordBot.Modules
                         }
                     }
                 }
+            }
+        }
+
+        [Command("flushlog")]
+        public async Task FlushLog() 
+        {
+            var user = Context.User as IGuildUser;
+            if (user.GuildPermissions.Administrator) 
+            {
+
+                Console.Clear();
+
+                await SendConfirmation();
+            } else 
+            {
+                await SendDenial();
             }
         }
     }
