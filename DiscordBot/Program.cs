@@ -18,11 +18,15 @@ namespace DiscordBot
         public static FileStream ostrm;
         public static StreamWriter writer;
         public static TextWriter stdOut;
+
+        public static SocketGuild guild;
+
         static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
 
         private DiscordSocketClient client = new DiscordSocketClient();
         private CommandService commands = new CommandService();
         private IServiceProvider services;
+
 
         public async Task RunBotAsync()
         {
@@ -88,17 +92,27 @@ namespace DiscordBot
             await DMs.SendMessageAsync(
                  $"Welcome to the **Buddies** server!\n" +
                 "Please read the rules, change your nickname to your real name and ask me for your roles!\n" +
+                "All commands are prefixed by \"!\"" +
                 "Role commands are programming, graphics, design, pm, newcomer, 1st, 2nd, 3rd, 4th and alumni\n" +
-                "You can also ask for !help if you don't remember a command!"
+                "So for example if you're in your first year in game design and programming, you could write:\n" +
+                "!programming\n" +
+                "!1st\n" +
+                "You also type !help if you don't remember a command!"
             );
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
         {
+            //ugly but needed
+            if (guild == null)
+            {
+                guild = client.GetGuild(441370070711533588); //buddies discord server id
+            }
+
             var message = arg as SocketUserMessage;
             var context = new SocketCommandContext(client, message);
             if (message.Author.IsBot) return;
-
+            
             int argumentPosition = 0;
             if (message.HasStringPrefix("!", ref argumentPosition) 
                 || message.HasStringPrefix("frog ", ref argumentPosition) 

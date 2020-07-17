@@ -15,15 +15,20 @@ namespace DiscordBot.Modules
 
         private enum Minors
         {
-            Programming, Graphics, Design, PM
+            Programming, 
+            Graphics, 
+            Design, 
+            PM
         }
 
-        private static readonly Dictionary<Minors, string> minorRoles = new Dictionary<Minors, string>()
+        //todo: have these be read from a file we can upload to the server while it's running
+        //then we could add a command like "hey, look at that file again I just changed it"
+        private static readonly Dictionary<Minors, ulong> minorRoles = new Dictionary<Minors, ulong>()
         {
-            { Minors.Programming, "Programming" },
-            { Minors.Graphics, "Graphics" },
-            { Minors.Design, "Design" },
-            { Minors.PM, "Project Management" }
+            { Minors.Programming,   471661457650483230 },
+            { Minors.Graphics,      471661504542801921 },
+            { Minors.Design,        471661568145358848 },
+            { Minors.PM,            471661564613623808 }
         };
 
         private enum Years
@@ -36,21 +41,20 @@ namespace DiscordBot.Modules
             Alumni
         }
 
-        private static readonly Dictionary<Years, string> yearRoles = new Dictionary<Years, string>()
+        private static readonly Dictionary<Years, ulong> yearRoles = new Dictionary<Years, ulong>()
         {
-           {Years.Newcomer,"0 Year"},
-           {Years.First,"1st Year"},
-           {Years.Second,"2nd Year"},
-           {Years.Third,"3rd Year"},
-           {Years.Masters,"4th Year - Masters"},
-           {Years.Alumni,"Alumni"},
+           {Years.Newcomer, 709470722363359253 },
+           {Years.First,    570962630701744138 },
+           {Years.Second,   443902787172958219 },
+           {Years.Third,    443901214908874755 },
+           {Years.Masters,  596227227650097172 },
+           {Years.Alumni,   443902508851527683 },
         };
-
 
         private bool IsValidRoleRequest(IGuildUser user, SocketRole role)
         {
-            bool yearRole = yearRoles.ContainsValue(role.Name);
-            bool minorRole = minorRoles.ContainsValue(role.Name);
+            bool yearRole = yearRoles.ContainsValue(role.Id);
+            bool minorRole = minorRoles.ContainsValue(role.Id);
             
             if (!yearRole && !minorRole) return true;
 
@@ -58,17 +62,15 @@ namespace DiscordBot.Modules
             {
                 if (id == role.Id) continue;
 
-                var roleName = Context.Guild.GetRole(id).Name;
-
                 if (yearRole)
                 {
-                    if (yearRoles.ContainsValue(roleName))
+                    if (yearRoles.ContainsValue(id))
                         return false;
                 }
                 else //minor role
                 {
                     //masters students dont have minors
-                    if(roleName == yearRoles[Years.Masters] || minorRoles.ContainsValue(roleName))
+                    if(id == yearRoles[Years.Masters] || minorRoles.ContainsValue(id))
                         return false;
                 }
             }
@@ -78,51 +80,76 @@ namespace DiscordBot.Modules
 
         private async Task SendConfirmation()
         {
-            if (Emote.TryParse("<:frogthumbsup:722037848890671105>", out var emote))
+            if (Emote.TryParse("<:frogthumbsup:733751715160915968>", out var emote))
             {
                 await Context.Message.AddReactionAsync(emote);
             }
             else
             {
-                await Context.Message.AddReactionAsync(new Emoji("👍"));
+                await Context.Message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44D)));
             }
         }
         private async Task SendDenial() 
         {
-            if (Emote.TryParse("<:frogthumbsdown:722234808327209010>", out var emote))
+            if (Emote.TryParse("<:frogthumbsdown:733751715098001509>", out var emote))
             {
                 await Context.Message.AddReactionAsync(emote);
             }
             else
             {
-                await Context.Message.AddReactionAsync(new Emoji("👎"));
+                await Context.Message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44E)));
             }
         }
 
-        private async Task ToggleRole(string roleName)
+        private async Task ToggleRole(ulong id)
         {
-            var user = Context.User as IGuildUser;
-            var ghostRole = Context.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
-            var role = Context.Guild.Roles.FirstOrDefault(x => x.Name == roleName);
-            
+            var buddiesGuild = Program.guild;
+
+            bool foreignServer = Context.Guild == null || Context.Guild.Id != buddiesGuild.Id;
+
+            var guildUser = buddiesGuild.GetUser(Context.User.Id) as IGuildUser;
+
+            if (guildUser == null) //user isn't in the buddies server
+            {
+                var message = $"User {Context.User.Username}#{Context.User.Discriminator} is trying to use the bot but they're not in the server.";
+                Console.WriteLine(message);
+                var moderatorChannel = buddiesGuild.GetTextChannel(592090738901254145);
+                await moderatorChannel.SendMessageAsync(message);
+                return;
+            }
+
+
+            SocketRole role, ghostRole;
+            try 
+            {
+                ghostRole = Program.guild.GetRole(496632805820727298); //ghost role id
+                role = buddiesGuild.GetRole(id);
+            }
+            catch (Exception exception) 
+            {
+                Console.WriteLine(exception.Message);
+                await SendDenial();
+                return;
+            }
+
             //check if the request is valid
-            if (ghostRole == null || role == null || !IsValidRoleRequest(user, role)) 
+            if (!IsValidRoleRequest(guildUser, role)) 
             {
                 await SendDenial();
                 return;
             }
             
             //remove ghost role if the user has it
-            if (user.RoleIds.Contains(ghostRole.Id)) await user.RemoveRoleAsync(ghostRole);
+            if (guildUser.RoleIds.Contains(ghostRole.Id)) await guildUser.RemoveRoleAsync(ghostRole);
 
-            if (user.RoleIds.Contains(role.Id))
+            if (guildUser.RoleIds.Contains(role.Id))
             {
-                Console.WriteLine($"Removed role {roleName} from user {user.Username + "#" + user.Discriminator}, id {user.Id}");
-                await user.RemoveRoleAsync(role);
+                Console.WriteLine($"Removed role {role.Name} from user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                await guildUser.RemoveRoleAsync(role);
             } else
             {
-                Console.WriteLine($"Added role {roleName} to user {user.Username + "#" + user.Discriminator}, id {user.Id}");
-                await user.AddRoleAsync(role);
+                Console.WriteLine($"Added role {role.Name} to user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                await guildUser.AddRoleAsync(role);
             }
 
             await SendConfirmation();
@@ -168,7 +195,7 @@ namespace DiscordBot.Modules
                 "Frogbot to the rescue!\n" +
                 "All of my commands are preceded by \"!\"\n" +
                 "Role commands are programming, graphics, design, pm, newcomer, 1st, 2nd, 3rd, 4th and alumni\n" +
-                "If you can manage message, cleanup <Amount> removes Amount of my messages\n" +
+                "If you can manage messages, cleanup <Amount> removes Amount of my messages\n" +
                 "So far, that's about it!"
                 );
         }
@@ -182,7 +209,9 @@ namespace DiscordBot.Modules
             if (user.GuildPermissions.ManageMessages) 
             {
                 var requestOptions = new RequestOptions();
-                requestOptions.AuditLogReason = $"Bot cleanup asked by {user.Nickname}#{user.Discriminator}";
+                var reason = $"Bot cleanup asked by {user.Nickname}#{user.Discriminator}";
+                requestOptions.AuditLogReason = reason;
+                Console.WriteLine(reason);
                 var messagesRequest = Context.Channel.GetMessagesAsync(amount, options: requestOptions);
                 await foreach(var messages in messagesRequest) 
                 {
