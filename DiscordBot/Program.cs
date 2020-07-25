@@ -110,6 +110,9 @@ namespace DiscordBot
             }
 
             var message = arg as SocketUserMessage;
+            if (message == null) return; //this should never happen... but it has! So don't remove this :'D
+
+
             var context = new SocketCommandContext(client, message);
             if (message.Author.IsBot) return;
             

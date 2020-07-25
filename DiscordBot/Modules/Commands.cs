@@ -101,23 +101,49 @@ namespace DiscordBot.Modules
             }
         }
 
+        private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild) 
+        {
+            SocketUser buddiesUser = null;
+            for (int i = 0; i < 10; i++) //try 10 times, this is needed because we might get a false negative... thanks discord.net, very cool
+            {
+                buddiesUser = guild.GetUser(Context.User.Id);
+                if (buddiesUser != null) break;
+                await Task.Delay(100);
+            }
+
+            if (buddiesUser == null) //user isn't found in the guild
+            {
+                var message = $"User {Context.User.Username}#{Context.User.Discriminator} is trying to use the bot but they're not in the server.";
+                Console.WriteLine(message);
+                var moderatorChannel = guild.GetTextChannel(592090738901254145);
+                await moderatorChannel.SendMessageAsync(message);
+                return null;
+            }
+
+            var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out immediately because something went insanely wrong
+            if (guildUser == null)
+            {
+                var message = $"User {Context.User.Username}#{Context.User.Discriminator} was found in the guild but isn't an IGuildUser???????";
+                Console.WriteLine(message);
+                return null;
+            }
+
+            return guildUser;
+        }
+
         private async Task ToggleRole(ulong id)
         {
             var buddiesGuild = Program.guild;
 
-            bool foreignServer = Context.Guild == null || Context.Guild.Id != buddiesGuild.Id;
-
-            var guildUser = buddiesGuild.GetUser(Context.User.Id) as IGuildUser;
-
-            if (guildUser == null) //user isn't in the buddies server
+            if(buddiesGuild == null) 
             {
-                var message = $"User {Context.User.Username}#{Context.User.Discriminator} is trying to use the bot but they're not in the server.";
-                Console.WriteLine(message);
-                var moderatorChannel = buddiesGuild.GetTextChannel(592090738901254145);
-                await moderatorChannel.SendMessageAsync(message);
+                Console.WriteLine("Buddies hasn't been set. Bailing out!");
                 return;
             }
 
+            //try to get the user
+            var guildUser = await GetUserFromGuild(buddiesGuild);
+            if (guildUser == null) return;
 
             SocketRole role, ghostRole;
             try 
