@@ -9,6 +9,8 @@ using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Linq;
 using System.IO;
+using System.Collections;
+using System.Linq.Expressions;
 
 namespace DiscordBot
 {
@@ -63,7 +65,7 @@ namespace DiscordBot
             await RegisterCommandsAsync();
 
             await client.LoginAsync(TokenType.Bot, token);
-
+            
             await client.StartAsync();
 
             await Task.Delay(-1);
@@ -85,6 +87,10 @@ namespace DiscordBot
         private async Task HandleUserJoinedAsync(SocketGuildUser user)
         {
             if (user.IsBot) return;
+
+            IGuild[] guilds = { guild };
+            await client.DownloadUsersAsync(guilds);
+
             var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
             if (ghostRole != null) await user.AddRoleAsync(ghostRole);
 

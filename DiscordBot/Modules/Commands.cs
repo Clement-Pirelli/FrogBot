@@ -103,7 +103,7 @@ namespace DiscordBot.Modules
 
         private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild) 
         {
-            SocketUser buddiesUser = null;
+            SocketGuildUser buddiesUser = null;
             for (int i = 0; i < 10; i++) //try 10 times, this is needed because we might get a false negative... thanks discord.net, very cool
             {
                 buddiesUser = guild.GetUser(Context.User.Id);
