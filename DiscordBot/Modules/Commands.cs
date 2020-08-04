@@ -156,10 +156,6 @@ namespace DiscordBot.Modules
         [Command("pm")]
         public async Task PM() => await ToggleRole(Program.minorRoles[Minors.PM]);
 
-
-        [Command("newcomer")]
-        public async Task ZerothYear() => await ToggleRole(Program.yearRoles[Years.Newcomer]);
-
         [Command("1st")]
         public async Task FirstYear() => await ToggleRole(Program.yearRoles[Years.First]);
 
@@ -169,7 +165,7 @@ namespace DiscordBot.Modules
         [Command("3rd")]
         public async Task ThirdYear() => await ToggleRole(Program.yearRoles[Years.Third]);
 
-        [Command("4th")]
+        [Command("masters")]
         public async Task Masters() => await ToggleRole(Program.yearRoles[Years.Masters]);
 
         [Command("alumni")]

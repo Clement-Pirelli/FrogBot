@@ -26,10 +26,10 @@ namespace DiscordBot
         Design,
         PM
     }
+
     [Serializable]
     public enum Years
     {
-        Newcomer,
         First,
         Second,
         Third,
