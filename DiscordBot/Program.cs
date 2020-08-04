@@ -10,16 +10,49 @@ using System.Reflection;
 using System.Linq;
 using System.IO;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq.Expressions;
+
+//delet
+using System.Xml.Serialization;
 
 namespace DiscordBot
 {
-    class Program
+    [Serializable]
+    public enum Minors
     {
-        public static readonly string logFileName = "DiscordBotLog.txt";
-        public static FileStream ostrm;
-        public static StreamWriter writer;
-        public static TextWriter stdOut;
+        Programming,
+        Graphics,
+        Design,
+        PM
+    }
+    [Serializable]
+    public enum Years
+    {
+        Newcomer,
+        First,
+        Second,
+        Third,
+        Masters,
+        Alumni
+    }
+    public class Program
+    {
+        public static readonly string logFileName = "./DiscordBotLog.txt";
+        public static readonly string minorRolesFileName = "./MinorRoles.xml";
+        public static readonly string yearRolesFileName = "./YearRoles.xml";
+        public static readonly string welcomeMessageFileName = "./WelcomeMessage.txt";
+        public static readonly string helpMessageFileName = "./HelpMessage.txt";
+
+
+        public static FileDictionary<Minors, ulong> minorRoles;
+        public static FileDictionary<Years, ulong> yearRoles;
+        public static FileString welcomeMessage;
+        public static FileString helpMessage;
+
+        private static FileStream ostrm;
+        private static StreamWriter writer;
+        private static TextWriter stdOut;
 
         public static SocketGuild guild;
 
@@ -35,13 +68,13 @@ namespace DiscordBot
             stdOut = Console.Out;
             try
             {
-                ostrm = new FileStream($"./{logFileName}", FileMode.OpenOrCreate, FileAccess.Write);
+                ostrm = new FileStream(logFileName, FileMode.OpenOrCreate, FileAccess.Write);
                 writer = new StreamWriter(ostrm);
                 writer.AutoFlush = true;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Cannot open {logFileName} for writing");
+                Console.WriteLine($"Cannot open \"{logFileName}\" for writing");
                 Console.WriteLine(e.Message);
                 return;
             }
@@ -59,6 +92,12 @@ namespace DiscordBot
                 Console.WriteLine(e.Message);
                 return;
             }
+
+            //todo: check if they've all loaded successfully?
+            minorRoles = new FileDictionary<Minors, ulong>("./MinorRoles.xml");
+            yearRoles = new FileDictionary<Years, ulong>("./YearRoles.xml");
+            welcomeMessage = new FileString(welcomeMessageFileName);
+            helpMessage = new FileString(helpMessageFileName);
 
             client.Log += ClientLog;
 
@@ -95,16 +134,7 @@ namespace DiscordBot
             if (ghostRole != null) await user.AddRoleAsync(ghostRole);
 
             var DMs = await user.GetOrCreateDMChannelAsync();
-            await DMs.SendMessageAsync(
-                 $"Welcome to the **Buddies** server!\n" +
-                "Please read the rules, change your nickname to your real name and ask me for your roles!\n" +
-                "All commands are prefixed by \"!\"" +
-                "Role commands are programming, graphics, design, pm, newcomer, 1st, 2nd, 3rd, 4th and alumni\n" +
-                "So for example if you're in your first year in game design and programming, you could write:\n" +
-                "!programming\n" +
-                "!1st\n" +
-                "You also type !help if you don't remember a command!"
-            );
+            await DMs.SendMessageAsync(welcomeMessage.Contents);
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
