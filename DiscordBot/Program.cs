@@ -52,20 +52,17 @@ namespace DiscordBot
 
         private static FileStream ostrm;
         private static StreamWriter writer;
-        private static TextWriter stdOut;
 
         public static SocketGuild guild;
 
-        static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
-
-        private DiscordSocketClient client = new DiscordSocketClient();
+        private DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig { AlwaysDownloadUsers = true });
         private CommandService commands = new CommandService();
         private IServiceProvider services;
 
+        static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
 
         public async Task RunBotAsync()
         {
-            stdOut = Console.Out;
             try
             {
                 ostrm = new FileStream(logFileName, FileMode.OpenOrCreate, FileAccess.Write);
