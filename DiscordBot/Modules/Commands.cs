@@ -40,6 +40,11 @@ namespace DiscordBot.Modules
             return true;
         }
 
+        private string GetFormattedUsername()
+        {
+            return Context.User.Username + "#" + Context.User.Discriminator;
+        }
+
         private async Task SendConfirmation()
         {
             if (Emote.TryParse("<:frogthumbsup:733751715160915968>", out var emote))
@@ -63,6 +68,13 @@ namespace DiscordBot.Modules
             }
         }
 
+        private async Task SendToModeratorChat(string message, SocketGuild guild) 
+        {
+            Console.WriteLine(message);
+            var moderatorChannel = guild.GetTextChannel(592090738901254145);
+            await moderatorChannel.SendMessageAsync(message);
+        }
+
         private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild) 
         {
             SocketGuildUser buddiesUser = null;
@@ -70,22 +82,21 @@ namespace DiscordBot.Modules
             {
                 buddiesUser = guild.GetUser(Context.User.Id);
                 if (buddiesUser != null) break;
-                await Task.Delay(100);
+                await Task.Delay(1000);
             }
 
             if (buddiesUser == null) //user isn't found in the guild
             {
-                var message = $"User {Context.User.Username}#{Context.User.Discriminator} is trying to use the bot but they're not in the server.";
-                Console.WriteLine(message);
-                var moderatorChannel = guild.GetTextChannel(592090738901254145);
-                await moderatorChannel.SendMessageAsync(message);
+                var message = $"User {GetFormattedUsername()} is trying to use the bot but they're not in the server.";
+                await SendToModeratorChat(message, guild);
+                await Context.Channel.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
                 return null;
             }
 
             var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out immediately because something went insanely wrong
             if (guildUser == null)
             {
-                var message = $"User {Context.User.Username}#{Context.User.Discriminator} was found in the guild but isn't an IGuildUser???????";
+                var message = $"User {GetFormattedUsername()} was found in the guild but isn't an IGuildUser???????";
                 Console.WriteLine(message);
                 return null;
             }
@@ -95,52 +106,55 @@ namespace DiscordBot.Modules
 
         private async Task ToggleRole(ulong id)
         {
-            var buddiesGuild = Program.guild;
-
-            if(buddiesGuild == null) 
-            {
-                Console.WriteLine("Buddies hasn't been set. Bailing out!");
-                return;
-            }
-
-            //try to get the user
-            var guildUser = await GetUserFromGuild(buddiesGuild);
-            if (guildUser == null) return;
-
-            SocketRole role, ghostRole;
             try 
             {
+                var buddiesGuild = Program.guild;
+
+                if (buddiesGuild == null)
+                {
+                    throw new Exception("Buddies hasn't been set. Bailing out!");
+                }
+
+                //try to get the user
+                var guildUser = await GetUserFromGuild(buddiesGuild);
+                if (guildUser == null)
+                {
+                    var message = $"User {GetFormattedUsername()}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
+                    await SendToModeratorChat(message, buddiesGuild);
+                    throw new Exception(message);
+                }
+
+                SocketRole role, ghostRole;
                 ghostRole = Program.guild.GetRole(496632805820727298); //ghost role id
                 role = buddiesGuild.GetRole(id);
+
+                //check if the request is valid
+                if (!IsValidRoleRequest(guildUser, role))
+                {
+                    throw new Exception($"User {GetFormattedUsername()}'s request for role: {buddiesGuild.GetRole(id).Name} is not valid!");
+                }
+
+                //remove ghost role if the user has it
+                if (guildUser.RoleIds.Contains(ghostRole.Id)) await guildUser.RemoveRoleAsync(ghostRole);
+
+                if (guildUser.RoleIds.Contains(role.Id))
+                {
+                    Console.WriteLine($"Removed role {role.Name} from user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                    await guildUser.RemoveRoleAsync(role);
+                }
+                else
+                {
+                    Console.WriteLine($"Added role {role.Name} to user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                    await guildUser.AddRoleAsync(role);
+                }
+
+                await SendConfirmation();
             }
-            catch (Exception exception) 
+            catch (Exception e) 
             {
-                Console.WriteLine(exception.Message);
+                Console.WriteLine(e.Message);
                 await SendDenial();
-                return;
             }
-
-            //check if the request is valid
-            if (!IsValidRoleRequest(guildUser, role)) 
-            {
-                await SendDenial();
-                return;
-            }
-            
-            //remove ghost role if the user has it
-            if (guildUser.RoleIds.Contains(ghostRole.Id)) await guildUser.RemoveRoleAsync(ghostRole);
-
-            if (guildUser.RoleIds.Contains(role.Id))
-            {
-                Console.WriteLine($"Removed role {role.Name} from user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
-                await guildUser.RemoveRoleAsync(role);
-            } else
-            {
-                Console.WriteLine($"Added role {role.Name} to user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
-                await guildUser.AddRoleAsync(role);
-            }
-
-            await SendConfirmation();
         }
 
         //this is sad code but eh well.

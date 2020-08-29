@@ -123,15 +123,20 @@ namespace DiscordBot
         private async Task HandleUserJoinedAsync(SocketGuildUser user)
         {
             if (user.IsBot) return;
+            try
+            {
+                IGuild[] guilds = { guild };
+                await client.DownloadUsersAsync(guilds);
 
-            IGuild[] guilds = { guild };
-            await client.DownloadUsersAsync(guilds);
+                var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
+                if (ghostRole != null) await user.AddRoleAsync(ghostRole);
 
-            var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
-            if (ghostRole != null) await user.AddRoleAsync(ghostRole);
-
-            var DMs = await user.GetOrCreateDMChannelAsync();
-            await DMs.SendMessageAsync(welcomeMessage.Contents);
+                var DMs = await user.GetOrCreateDMChannelAsync();
+                await DMs.SendMessageAsync(welcomeMessage.Contents);
+            } catch(Exception e) 
+            {
+                Console.WriteLine(e.Message);
+            }
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
@@ -143,22 +148,21 @@ namespace DiscordBot
             }
 
             var message = arg as SocketUserMessage;
-            if (message == null) return; //this should never happen... but it has! So don't remove this :'D
+            //message == null should never happen... but it has! So don't remove this :'D
+            if (message == null || message.Author.IsBot) return; 
 
-
-            var context = new SocketCommandContext(client, message);
-            if (message.Author.IsBot) return;
-            
+            var context = new SocketCommandContext(client, message);            
             int argumentPosition = 0;
-            if (message.HasStringPrefix("!", ref argumentPosition) 
-                || message.HasStringPrefix("frog ", ref argumentPosition) 
-                || message.HasStringPrefix("Oh great FromgBot, ", ref argumentPosition)
-                )
+            if (message.HasStringPrefix("!", ref argumentPosition))
             {
-                var result = await commands.ExecuteAsync(context, argumentPosition, services);
-                if (!result.IsSuccess)
+                try 
                 {
-                    Console.WriteLine(result.ErrorReason);
+                    var result = await commands.ExecuteAsync(context, argumentPosition, services);
+                    if (!result.IsSuccess)
+                        throw new Exception(result.ErrorReason);
+                } catch(Exception e)
+                {
+                    Console.WriteLine(e.Message);
                 }
             }
         }
