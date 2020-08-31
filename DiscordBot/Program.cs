@@ -126,9 +126,6 @@ namespace DiscordBot
             if (user.IsBot) return;
             try
             {
-                IGuild[] guilds = { guild };
-                await client.DownloadUsersAsync(guilds);
-
                 var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
                 if (ghostRole != null) await user.AddRoleAsync(ghostRole);
 

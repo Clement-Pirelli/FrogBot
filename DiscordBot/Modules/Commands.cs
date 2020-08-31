@@ -8,6 +8,8 @@ using Discord;
 using Discord.WebSocket;
 using System.IO;
 using System.Xml.Serialization;
+using System.Runtime.CompilerServices;
+using System.Net.Sockets;
 
 namespace DiscordBot.Modules
 {
@@ -42,9 +44,9 @@ namespace DiscordBot.Modules
             return true;
         }
 
-        private string GetFormattedUsername()
+        private string GetFormattedUsername(SocketUser user)
         {
-            return Context.User.Username + "#" + Context.User.Discriminator;
+            return user.Username + "#" + user.Discriminator;
         }
 
         private async Task SendConfirmation()
@@ -77,29 +79,29 @@ namespace DiscordBot.Modules
             await moderatorChannel.SendMessageAsync(message);
         }
 
-        private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild) 
+        private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild, SocketUser user) 
         {
             SocketGuildUser buddiesUser = null;
             await guild.DownloadUsersAsync();
             for (int i = 0; i < 10; i++) //try 10 times, this is needed because we might get a false negative... thanks discord.net, very cool
             {
-                buddiesUser = guild.GetUser(Context.User.Id);
+                buddiesUser = guild.GetUser(user.Id);
                 if (buddiesUser != null) break;
                 await Task.Delay(100);
             }
 
             if (buddiesUser == null) //user isn't found in the guild
             {
-                var message = $"User @{GetFormattedUsername()} is trying to use the bot but they're not in the server.";
+                var message = $"User @{GetFormattedUsername(user)} is trying to use the bot but GetUser has failed 10 times";
                 await SendToModeratorChat(message, guild);
                 await Context.Channel.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
                 return null;
             }
 
-            var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out immediately because something went insanely wrong
+            var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out, something went insanely wrong
             if (guildUser == null)
             {
-                var message = $"User @{GetFormattedUsername()} was found in the guild but isn't an IGuildUser???????";
+                var message = $"User @{GetFormattedUsername(user)} was found in the guild but isn't an IGuildUser???????";
                 Console.WriteLine(message);
                 return null;
             }
@@ -127,12 +129,12 @@ namespace DiscordBot.Modules
 
                 if(guildUser == null) 
                 {
-                    guildUser = await GetUserFromGuild(buddiesGuild);
+                    guildUser = await GetUserFromGuild(buddiesGuild, Context.User);
                 }
 
                 if (guildUser == null)
                 {
-                    var message = $"User {GetFormattedUsername()}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
+                    var message = $"User @{GetFormattedUsername(Context.User)}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
                     await SendToModeratorChat(message, buddiesGuild);
                     throw new Exception(message);
                 }
@@ -144,7 +146,7 @@ namespace DiscordBot.Modules
                 //check if the request is valid
                 if (!IsValidRoleRequest(guildUser, role))
                 {
-                    throw new Exception($"User {GetFormattedUsername()}'s request for role: {buddiesGuild.GetRole(id).Name} is not valid!");
+                    throw new Exception($"User @{GetFormattedUsername(Context.User)}'s request for role: {buddiesGuild.GetRole(id).Name} is not valid!");
                 }
 
                 //remove ghost role if the user has it
@@ -152,12 +154,12 @@ namespace DiscordBot.Modules
 
                 if (guildUser.RoleIds.Contains(role.Id))
                 {
-                    Console.WriteLine($"Removed role {role.Name} from user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                    Console.WriteLine($"Removed role {role.Name} from user {GetFormattedUsername(Context.User)}, id {Context.User.Id}");
                     await guildUser.RemoveRoleAsync(role);
                 }
                 else
                 {
-                    Console.WriteLine($"Added role {role.Name} to user {guildUser.Username + "#" + guildUser.Discriminator}, id {guildUser.Id}");
+                    Console.WriteLine($"Added role {role.Name} to user {GetFormattedUsername(Context.User)}, id {Context.User.Id}");
                     await guildUser.AddRoleAsync(role);
                 }
 
@@ -170,7 +172,7 @@ namespace DiscordBot.Modules
             }
         }
 
-        //this is sad code but eh well.
+        //this is sad code but eh well, TODO make it better :')
         [Command("programming")]
         public async Task Programmer() => await ToggleRole(Program.minorRoles[Minors.Programming]);
 
@@ -207,7 +209,7 @@ namespace DiscordBot.Modules
 
         private async Task ExecuteAdminCommand(Func<Task> task)
         {
-            var user = await GetUserFromGuild(Program.guild);
+            var user = await GetUserFromGuild(Program.guild, Context.User);
             if (user != null && user.GuildPermissions.Administrator)
             {
                 await task();
