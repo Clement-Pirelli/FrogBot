@@ -32,7 +32,9 @@ namespace DiscordBot.Modules
                 else //minor role
                 {
                     //masters students dont have minors
-                    if(id == Program.yearRoles[Years.Masters] || Program.minorRoles.Data.ContainsValue(id))
+                    if(id == Program.yearRoles[Years.Masters]  || 
+                       id == Program.yearRoles[Years.MastersSecond] || 
+                       Program.minorRoles.Data.ContainsValue(id))
                         return false;
                 }
             }
@@ -78,16 +80,17 @@ namespace DiscordBot.Modules
         private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild) 
         {
             SocketGuildUser buddiesUser = null;
+            await guild.DownloadUsersAsync();
             for (int i = 0; i < 10; i++) //try 10 times, this is needed because we might get a false negative... thanks discord.net, very cool
             {
                 buddiesUser = guild.GetUser(Context.User.Id);
                 if (buddiesUser != null) break;
-                await Task.Delay(1000);
+                await Task.Delay(100);
             }
 
             if (buddiesUser == null) //user isn't found in the guild
             {
-                var message = $"User {GetFormattedUsername()} is trying to use the bot but they're not in the server.";
+                var message = $"User @{GetFormattedUsername()} is trying to use the bot but they're not in the server.";
                 await SendToModeratorChat(message, guild);
                 await Context.Channel.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
                 return null;
@@ -96,7 +99,7 @@ namespace DiscordBot.Modules
             var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out immediately because something went insanely wrong
             if (guildUser == null)
             {
-                var message = $"User {GetFormattedUsername()} was found in the guild but isn't an IGuildUser???????";
+                var message = $"User @{GetFormattedUsername()} was found in the guild but isn't an IGuildUser???????";
                 Console.WriteLine(message);
                 return null;
             }
@@ -116,7 +119,17 @@ namespace DiscordBot.Modules
                 }
 
                 //try to get the user
-                var guildUser = await GetUserFromGuild(buddiesGuild);
+                IGuildUser guildUser = null;
+                if (Context.Guild != null) 
+                {
+                    guildUser = Context.User as IGuildUser;
+                }
+
+                if(guildUser == null) 
+                {
+                    guildUser = await GetUserFromGuild(buddiesGuild);
+                }
+
                 if (guildUser == null)
                 {
                     var message = $"User {GetFormattedUsername()}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
@@ -179,8 +192,11 @@ namespace DiscordBot.Modules
         [Command("3rd")]
         public async Task ThirdYear() => await ToggleRole(Program.yearRoles[Years.Third]);
 
-        [Command("masters")]
+        [Command("masters1")]
         public async Task Masters() => await ToggleRole(Program.yearRoles[Years.Masters]);
+
+        [Command("masters2")]
+        public async Task MastersSecond() => await ToggleRole(Program.yearRoles[Years.MastersSecond]);
 
         [Command("alumni")]
         public async Task Alumni() => await ToggleRole(Program.yearRoles[Years.Alumni]);
@@ -208,6 +224,7 @@ namespace DiscordBot.Modules
         private async Task ExecuteAdminCommand(Action action) => await ExecuteAdminCommand(async () => action());
 #pragma warning restore CS1998
 
+        [RequireContext(ContextType.Guild)]
         [Command("cleanup")]
         public async Task Cleanup(int amount)
         {

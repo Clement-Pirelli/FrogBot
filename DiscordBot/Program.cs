@@ -34,6 +34,7 @@ namespace DiscordBot
         Second,
         Third,
         Masters,
+        MastersSecond,
         Alumni
     }
     public class Program
