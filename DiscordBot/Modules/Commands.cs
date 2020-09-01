@@ -15,138 +15,43 @@ namespace DiscordBot.Modules
 {
     class Commands : ModuleBase<SocketCommandContext>
     {
-        private bool IsValidRoleRequest(IGuildUser user, SocketRole role)
+        private const ulong buddiesId = 441370070711533588;
+        public async Task ToggleRole(ulong id)
         {
-            bool yearRole = Program.yearRoles.Data.ContainsValue(role.Id);
-            bool minorRole = Program.minorRoles.Data.ContainsValue(role.Id);
-            
-            if (!yearRole && !minorRole) return true;
-
-            foreach (var id in user.RoleIds)
+            try
             {
-                if (id == role.Id) continue;
-
-                if (yearRole)
-                {
-                    if (Program.yearRoles.Data.ContainsValue(id))
-                        return false;
-                }
-                else //minor role
-                {
-                    //masters students dont have minors
-                    if(id == Program.yearRoles[Years.Masters]  || 
-                       id == Program.yearRoles[Years.MastersSecond] || 
-                       Program.minorRoles.Data.ContainsValue(id))
-                        return false;
-                }
-            }
-
-            return true;
-        }
-
-        private string GetFormattedUsername(SocketUser user)
-        {
-            return user.Username + "#" + user.Discriminator;
-        }
-
-        private async Task SendConfirmation()
-        {
-            if (Emote.TryParse("<:frogthumbsup:733751715160915968>", out var emote))
-            {
-                await Context.Message.AddReactionAsync(emote);
-            }
-            else
-            {
-                await Context.Message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44D)));
-            }
-        }
-        private async Task SendDenial() 
-        {
-            if (Emote.TryParse("<:frogthumbsdown:733751715098001509>", out var emote))
-            {
-                await Context.Message.AddReactionAsync(emote);
-            }
-            else
-            {
-                await Context.Message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44E)));
-            }
-        }
-
-        private async Task SendToModeratorChat(string message, SocketGuild guild) 
-        {
-            Console.WriteLine(message);
-            var moderatorChannel = guild.GetTextChannel(592090738901254145);
-            await moderatorChannel.SendMessageAsync(message);
-        }
-
-        private async Task<IGuildUser> GetUserFromGuild(SocketGuild guild, SocketUser user) 
-        {
-            SocketGuildUser buddiesUser = null;
-            await guild.DownloadUsersAsync();
-            for (int i = 0; i < 10; i++) //try 10 times, this is needed because we might get a false negative... thanks discord.net, very cool
-            {
-                buddiesUser = guild.GetUser(user.Id);
-                if (buddiesUser != null) break;
-                await Task.Delay(100);
-            }
-
-            if (buddiesUser == null) //user isn't found in the guild
-            {
-                var message = $"User @{GetFormattedUsername(user)} is trying to use the bot but GetUser has failed 10 times";
-                await SendToModeratorChat(message, guild);
-                await Context.Channel.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
-                return null;
-            }
-
-            var guildUser = buddiesUser as IGuildUser; //this should always work. If it doesn't, bail out, something went insanely wrong
-            if (guildUser == null)
-            {
-                var message = $"User @{GetFormattedUsername(user)} was found in the guild but isn't an IGuildUser???????";
-                Console.WriteLine(message);
-                return null;
-            }
-
-            return guildUser;
-        }
-
-        private async Task ToggleRole(ulong id)
-        {
-            try 
-            {
-                var buddiesGuild = Program.guild;
-
+                var buddiesGuild = Context.Client.GetGuild(buddiesId);
                 if (buddiesGuild == null)
                 {
-                    throw new Exception("Buddies hasn't been set. Bailing out!");
+                    throw new Exception("Buddies can't be found. Bailing out!");
                 }
 
                 //try to get the user
                 IGuildUser guildUser = null;
-                if (Context.Guild != null) 
-                {
-                    guildUser = Context.User as IGuildUser;
-                }
+                guildUser = Context.User as IGuildUser;
 
-                if(guildUser == null) 
+                //if we're in DMs
+                if (guildUser == null)
                 {
-                    guildUser = await GetUserFromGuild(buddiesGuild, Context.User);
+                    guildUser = await Utilities.GetUserFromGuild(buddiesGuild, Context.User);
                 }
 
                 if (guildUser == null)
                 {
-                    var message = $"User @{GetFormattedUsername(Context.User)}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
-                    await SendToModeratorChat(message, buddiesGuild);
+                    var message = $"User @{Context.User}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(id).Name }";
+                    await Utilities.SendToModeratorChat(message, buddiesGuild); 
+                    await Context.Channel.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
                     throw new Exception(message);
                 }
 
                 SocketRole role, ghostRole;
-                ghostRole = Program.guild.GetRole(496632805820727298); //ghost role id
+                ghostRole = buddiesGuild.GetRole(496632805820727298); //ghost role id
                 role = buddiesGuild.GetRole(id);
 
                 //check if the request is valid
-                if (!IsValidRoleRequest(guildUser, role))
+                if (!Utilities.IsValidRoleRequest(guildUser, role))
                 {
-                    throw new Exception($"User @{GetFormattedUsername(Context.User)}'s request for role: {buddiesGuild.GetRole(id).Name} is not valid!");
+                    throw new Exception($"User @{Context.User}'s request for role: {buddiesGuild.GetRole(id).Name} is not valid!");
                 }
 
                 //remove ghost role if the user has it
@@ -154,23 +59,24 @@ namespace DiscordBot.Modules
 
                 if (guildUser.RoleIds.Contains(role.Id))
                 {
-                    Console.WriteLine($"Removed role {role.Name} from user {GetFormattedUsername(Context.User)}, id {Context.User.Id}");
+                    Console.WriteLine($"Removed role {role.Name} from user {Context.User}, id {Context.User.Id}");
                     await guildUser.RemoveRoleAsync(role);
                 }
                 else
                 {
-                    Console.WriteLine($"Added role {role.Name} to user {GetFormattedUsername(Context.User)}, id {Context.User.Id}");
+                    Console.WriteLine($"Added role {role.Name} to user {Context.User}, id {Context.User.Id}");
                     await guildUser.AddRoleAsync(role);
                 }
 
-                await SendConfirmation();
+                await Utilities.SendConfirmation(Context.Message);
             }
-            catch (Exception e) 
+            catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                await SendDenial();
+                await Utilities.SendDenial(Context.Message);
             }
         }
+
 
         //this is sad code but eh well, TODO make it better :')
         [Command("programming")]
@@ -207,64 +113,50 @@ namespace DiscordBot.Modules
         [Command("help")]
         public async Task Help() => await ReplyAsync(Program.helpMessage.Contents);
 
-        private async Task ExecuteAdminCommand(Func<Task> task)
-        {
-            var user = await GetUserFromGuild(Program.guild, Context.User);
-            if (user != null && user.GuildPermissions.Administrator)
-            {
-                await task();
-
-                await SendConfirmation();
-            }
-            else
-            {
-                await SendDenial();
-            }
-        }
-
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        private async Task ExecuteAdminCommand(Action action) => await ExecuteAdminCommand(async () => action());
-#pragma warning restore CS1998
-
         [RequireContext(ContextType.Guild)]
         [Command("cleanup")]
-        public async Task Cleanup(int amount)
+        [RequireUserPermission(ChannelPermission.ManageMessages)]
+        public async Task Cleanup()
         {
-            if (amount <= 0) amount = 100;
+            const int amount = 100;
 
-            await ExecuteAdminCommand(async () => 
+            var requestOptions = new RequestOptions();
+            var reason = $"Bot cleanup";
+            requestOptions.AuditLogReason = reason;
+            Console.WriteLine(reason);
+            var messagesRequest = Context.Channel.GetMessagesAsync(amount, options: requestOptions);
+            await foreach (var messages in messagesRequest)
             {
-                var requestOptions = new RequestOptions();
-                var reason = $"Bot cleanup";
-                requestOptions.AuditLogReason = reason;
-                Console.WriteLine(reason);
-                var messagesRequest = Context.Channel.GetMessagesAsync(amount, options: requestOptions);
-                await foreach (var messages in messagesRequest)
+                List<IMessage> messageList = new List<IMessage>();
+                foreach (var message in messages)
                 {
-                    foreach (var message in messages)
+                    if (message.Content.StartsWith('!') || message.Author.IsBot)
                     {
-                        if (message.Content.StartsWith('!') || message.Author.IsBot)
-                        {
-                            await Context.Channel.DeleteMessageAsync(message);
-                            await Task.Delay(100);
-                        }
+                        messageList.Add(message);
                     }
                 }
-            });
+                await (Context.Channel as ITextChannel).DeleteMessagesAsync(messageList);
+            }
         }
 
         [Command("flushlog")]
-        public async Task FlushLog() => await ExecuteAdminCommand(Console.Clear);
+        [RequireUserPermission(ChannelPermission.ManageChannels)]
+        public async Task FlushLog() 
+        {
+            Console.Clear(); 
+            await Utilities.SendConfirmation(Context.Message); 
+        }
 
         [Command("reloadfiles")]
-        public async Task Reload() => 
-            await ExecuteAdminCommand(() =>
-            {
-                //todo: it's fine for now to reload manually but at some point we might want to iterate over a collection of FileData
-                Program.yearRoles.Reload();
-                Program.minorRoles.Reload();
-                Program.helpMessage.Reload();
-                Program.welcomeMessage.Reload();
-            });
+        [RequireUserPermission(ChannelPermission.ManageChannels)]
+        public async Task Reload() 
+        {
+            Program.yearRoles.Reload();
+            Program.minorRoles.Reload();
+            Program.helpMessage.Reload();
+            Program.welcomeMessage.Reload();
+
+            await Utilities.SendConfirmation(Context.Message);
+        }
     }
 }

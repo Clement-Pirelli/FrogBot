@@ -54,8 +54,6 @@ namespace DiscordBot
         private static FileStream ostrm;
         private static StreamWriter writer;
 
-        public static SocketGuild guild;
-
         private DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig { AlwaysDownloadUsers = true });
         private CommandService commands = new CommandService();
         private IServiceProvider services;
@@ -139,12 +137,6 @@ namespace DiscordBot
 
         private async Task HandleCommandAsync(SocketMessage arg)
         {
-            //ugly but needed
-            if (guild == null)
-            {
-                guild = client.GetGuild(441370070711533588); //buddies discord server id
-            }
-
             var message = arg as SocketUserMessage;
             //message == null should never happen... but it has! So don't remove this :'D
             if (message == null || message.Author.IsBot) return; 
