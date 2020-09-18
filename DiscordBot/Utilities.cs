@@ -1,48 +1,75 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using Discord.Commands;
 using System.Threading.Tasks;
 using System.Linq;
 using Discord;
 using Discord.WebSocket;
-using System.IO;
-using System.Xml.Serialization;
-using System.Runtime.CompilerServices;
-using System.Net.Sockets;
 
 namespace DiscordBot
 {
     static class Utilities
     {
-
-        public static bool IsValidRoleRequest(IGuildUser user, SocketRole role)
+        private const ulong buddiesId = 441370070711533588;
+        public static SocketGuild BuddiesGuild(DiscordSocketClient client) 
         {
-            bool yearRole = Program.yearRoles.Data.ContainsValue(role.Id);
-            bool minorRole = Program.minorRoles.Data.ContainsValue(role.Id);
+            return client.GetGuild(buddiesId);
+        }
 
-            if (!yearRole && !minorRole) return true;
-
-            foreach (var id in user.RoleIds)
+        public static async Task ToggleRole(DiscordSocketClient client, SocketUser user, ulong roleId, SocketMessage optionalMessage = null)
+        {
+            try
             {
-                if (id == role.Id) continue;
+                var buddiesGuild = BuddiesGuild(client);
+                if (buddiesGuild == null)
+                {
+                    throw new Exception("Buddies can't be found. Bailing out!");
+                }
 
-                if (yearRole)
+                //try to get the user
+                IGuildUser guildUser = null;
+                guildUser = user as IGuildUser;
+
+                //if we're in DMs
+                if (guildUser == null)
                 {
-                    if (Program.yearRoles.Data.ContainsValue(id))
-                        return false;
+                    guildUser = await GetUserFromGuild(buddiesGuild, user);
                 }
-                else //minor role
+
+                if (guildUser == null)
                 {
-                    //masters students dont have minors
-                    if (id == Program.yearRoles[Years.Masters] ||
-                       id == Program.yearRoles[Years.MastersSecond] ||
-                       Program.minorRoles.Data.ContainsValue(id))
-                        return false;
+                    var message = $"User @{user}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(roleId).Name }";
+                    await SendToModeratorChat(message, buddiesGuild);
+                    await user.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
+                    throw new Exception(message);
                 }
+
+                SocketRole role, ghostRole;
+                ghostRole = buddiesGuild.GetRole(496632805820727298); //ghost role id
+                role = buddiesGuild.GetRole(roleId);
+
+
+                if (guildUser.RoleIds.Contains(role.Id))
+                {
+                    Console.WriteLine($"Removed role {role.Name} from user {user}, id {user.Id}");
+                    await guildUser.RemoveRoleAsync(role); 
+                    if (guildUser.RoleIds.Count == 2) //2 because the role we just removed + @everyone, which is a role... 
+                        await guildUser.AddRoleAsync(ghostRole);
+                }
+                else
+                {
+                    //remove ghost role if the user has it
+                    if (guildUser.RoleIds.Contains(ghostRole.Id)) await guildUser.RemoveRoleAsync(ghostRole);
+                    Console.WriteLine($"Added role {role.Name} to user {user}, id {user.Id}");
+                    await guildUser.AddRoleAsync(role);
+                }
+
+                if(optionalMessage != null) await SendConfirmation(optionalMessage);
             }
-
-            return true;
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                if (optionalMessage != null) await SendDenial(optionalMessage);
+            }
         }
 
         public static async Task SendConfirmation(IMessage message)
@@ -87,6 +114,14 @@ namespace DiscordBot
             }
 
             return buddiesUser;
+        }
+
+        public static List<SocketGuildUser> GetGhostsAndNoRoles(SocketGuild guild) 
+        {
+            return guild.Users.Where(
+                user => user.Roles.Count < 0 
+                || user.Roles.Any(role => role.Name == "Ghosts")
+                ).ToList();
         }
     }
 }

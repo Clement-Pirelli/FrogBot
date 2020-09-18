@@ -4,17 +4,9 @@ using Discord.Commands;
 using Discord.WebSocket;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.Runtime.InteropServices;
-using System.Reflection;
 using System.Linq;
 using System.IO;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq.Expressions;
-
-//delet
-using System.Xml.Serialization;
 
 namespace DiscordBot
 {
@@ -40,16 +32,9 @@ namespace DiscordBot
     public class Program
     {
         public static readonly string logFileName = "./DiscordBotLog.txt";
-        public static readonly string minorRolesFileName = "./MinorRoles.xml";
-        public static readonly string yearRolesFileName = "./YearRoles.xml";
-        public static readonly string welcomeMessageFileName = "./WelcomeMessage.txt";
-        public static readonly string helpMessageFileName = "./HelpMessage.txt";
+        public static readonly string emotesToRoleIdsFileName = "./EmotesToRoleIds.xml";
 
-
-        public static FileDictionary<Minors, ulong> minorRoles;
-        public static FileDictionary<Years, ulong> yearRoles;
-        public static FileString welcomeMessage;
-        public static FileString helpMessage;
+        public static FileDictionary<string, ulong> emotesToRoleIds;
 
         private static FileStream ostrm;
         private static StreamWriter writer;
@@ -89,11 +74,7 @@ namespace DiscordBot
                 return;
             }
 
-            //todo: check if they've all loaded successfully?
-            minorRoles = new FileDictionary<Minors, ulong>("./MinorRoles.xml");
-            yearRoles = new FileDictionary<Years, ulong>("./YearRoles.xml");
-            welcomeMessage = new FileString(welcomeMessageFileName);
-            helpMessage = new FileString(helpMessageFileName);
+            emotesToRoleIds = new FileDictionary<string, ulong>(emotesToRoleIdsFileName);
 
             client.Log += ClientLog;
 
@@ -116,19 +97,49 @@ namespace DiscordBot
         {
             client.MessageReceived += HandleCommandAsync;
             client.UserJoined += HandleUserJoinedAsync;
+            client.ReactionAdded += (Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction) => HandleReactionAsync(cacheableMessage, channel, reaction, true);
+            client.ReactionRemoved += (Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction) => HandleReactionAsync(cacheableMessage, channel, reaction, false); ;
             await commands.AddModuleAsync(typeof(Modules.Commands), services);
+        }
+
+        private async Task HandleReactionAsync(Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction, bool added)
+        {
+            if (!reaction.User.IsSpecified || reaction.User.Value.IsBot) return;
+            
+            var user = reaction.User.Value;
+            
+            try {
+               
+                var roleId = emotesToRoleIds[reaction.Emote.Name];
+
+                var socketUser = user as SocketUser;
+                if (socketUser == null) return;
+
+                await Utilities.ToggleRole(client, socketUser, roleId);
+            } catch(KeyNotFoundException e) 
+            {
+                if (added && channel.Id == 751219349012086904) //Id of the role-setting channel
+                {
+                    var message = await cacheableMessage.GetOrDownloadAsync();
+                    await message.RemoveReactionAsync(reaction.Emote, user);
+                }
+            }
         }
 
         private async Task HandleUserJoinedAsync(SocketGuildUser user)
         {
             if (user.IsBot) return;
+
             try
             {
                 var ghostRole = user.Guild.Roles.FirstOrDefault(x => x.Name == "Ghosts");
-                if (ghostRole != null) await user.AddRoleAsync(ghostRole);
-
-                var DMs = await user.GetOrCreateDMChannelAsync();
-                await DMs.SendMessageAsync(welcomeMessage.Contents);
+                if (ghostRole != null) 
+                {
+                    await user.AddRoleAsync(ghostRole);
+                } else
+                {
+                    throw new Exception("Ghost role couldn't be found!");
+                }
             } catch(Exception e) 
             {
                 Console.WriteLine(e.Message);
@@ -138,6 +149,7 @@ namespace DiscordBot
         private async Task HandleCommandAsync(SocketMessage arg)
         {
             var message = arg as SocketUserMessage;
+
             //message == null should never happen... but it has! So don't remove this :'D
             if (message == null || message.Author.IsBot) return; 
 
