@@ -74,14 +74,7 @@ namespace DiscordBot
 
         public static async Task SendConfirmation(IMessage message)
         {
-            if (Emote.TryParse("<:frogthumbsup:733751715160915968>", out var emote))
-            {
-                await message.AddReactionAsync(emote);
-            }
-            else
-            {
-                await message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44D)));
-            }
+            await message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44D)));
         }
         public static async Task SendDenial(IMessage message)
         {

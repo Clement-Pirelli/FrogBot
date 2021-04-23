@@ -15,9 +15,9 @@ namespace DiscordBot.Modules
         public async Task Cleanup()
         {
             const int amount = 100;
+            const String reason = "Bot cleanup";
 
             var requestOptions = new RequestOptions();
-            var reason = $"Bot cleanup";
             requestOptions.AuditLogReason = reason;
             Console.WriteLine(reason);
             var messagesRequest = Context.Channel.GetMessagesAsync(amount, options: requestOptions);
@@ -26,7 +26,8 @@ namespace DiscordBot.Modules
                 List<IMessage> messageList = new List<IMessage>();
                 foreach (var message in messages)
                 {
-                    if (message.Content.StartsWith('!') || message.Author.IsBot)
+                    if ((message.Content.StartsWith('!') || message.Author.IsBot) &&
+                        message.CreatedAt.CompareTo(DateTimeOffset.Now.AddDays(-14.0)) > 0) //make sure it's within two weeks
                     {
                         messageList.Add(message);
                     }
