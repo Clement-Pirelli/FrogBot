@@ -33,6 +33,7 @@ namespace DiscordBot
     {
         public static readonly string logFileName = "./DiscordBotLog.txt";
         public static readonly string emotesToRoleIdsFileName = "./EmotesToRoleIds.xml";
+        private const ulong roleSettingChannelId = 751219349012086904;
 
         public static FileDictionary<string, ulong> emotesToRoleIds;
 
@@ -87,10 +88,14 @@ namespace DiscordBot
             await Task.Delay(-1);
         }
 
+        private async Task Log(string message)
+        {
+            await Utilities.SendLog(message, Utilities.BuddiesGuild(client));
+        }
+
         private Task ClientLog(LogMessage arg)
         {
-            Console.WriteLine(arg);
-            return Task.CompletedTask;
+            return Log(arg.Message);
         }
 
         public async Task RegisterCommandsAsync()
@@ -98,7 +103,7 @@ namespace DiscordBot
             client.MessageReceived += HandleCommandAsync;
             client.UserJoined += HandleUserJoinedAsync;
             client.ReactionAdded += (Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction) => HandleReactionAsync(cacheableMessage, channel, reaction, true);
-            client.ReactionRemoved += (Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction) => HandleReactionAsync(cacheableMessage, channel, reaction, false); ;
+            client.ReactionRemoved += (Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction) => HandleReactionAsync(cacheableMessage, channel, reaction, false);
             await commands.AddModuleAsync(typeof(Modules.Commands), services);
         }
 
@@ -118,7 +123,7 @@ namespace DiscordBot
                 await Utilities.ToggleRole(client, socketUser, roleId);
             } catch(KeyNotFoundException e) 
             {
-                if (added && channel.Id == 751219349012086904) //Id of the role-setting channel
+                if (added && channel.Id == roleSettingChannelId)
                 {
                     var message = await cacheableMessage.GetOrDownloadAsync();
                     await message.RemoveReactionAsync(reaction.Emote, user);
@@ -142,7 +147,7 @@ namespace DiscordBot
                 }
             } catch(Exception e) 
             {
-                Console.WriteLine(e.Message);
+                await Log(e.Message);
             }
         }
 
@@ -153,7 +158,7 @@ namespace DiscordBot
             //message == null should never happen... but it has! So don't remove this :'D
             if (message == null || message.Author.IsBot) return; 
 
-            var context = new SocketCommandContext(client, message);            
+            var context = new SocketCommandContext(client, message);
             int argumentPosition = 0;
             if (message.HasStringPrefix("!", ref argumentPosition))
             {
@@ -164,7 +169,7 @@ namespace DiscordBot
                         throw new Exception(result.ErrorReason);
                 } catch(Exception e)
                 {
-                    Console.WriteLine(e.Message);
+                    await Log(e.Message);
                 }
             }
         }

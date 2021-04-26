@@ -10,6 +10,9 @@ namespace DiscordBot
     static class Utilities
     {
         private const ulong buddiesId = 441370070711533588;
+        private const ulong logChannelID = 836362119317422080;
+        private const ulong moderatorChannelID = 592090738901254145;
+
         public static SocketGuild BuddiesGuild(DiscordSocketClient client) 
         {
             return client.GetGuild(buddiesId);
@@ -38,7 +41,7 @@ namespace DiscordBot
                 if (guildUser == null)
                 {
                     var message = $"User @{user}'s GuildUser could not be retrieved for role : { buddiesGuild.GetRole(roleId).Name }";
-                    await SendToModeratorChat(message, buddiesGuild);
+                    await SendModerators(message, buddiesGuild);
                     await user.SendMessageAsync("I'm really sorry but something went terribly wrong in toggling your role :( Don't worry though, a moderator will see that this operation has failed and hopefully add your role manually soon. \nApologies!");
                     throw new Exception(message);
                 }
@@ -63,20 +66,20 @@ namespace DiscordBot
                     await guildUser.AddRoleAsync(role);
                 }
 
-                if(optionalMessage != null) await SendConfirmation(optionalMessage);
+                if(optionalMessage != null) await ConfirmMessage(optionalMessage);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                if (optionalMessage != null) await SendDenial(optionalMessage);
+                if (optionalMessage != null) await DenyMessage(optionalMessage);
             }
         }
 
-        public static async Task SendConfirmation(IMessage message)
+        public static async Task ConfirmMessage(IMessage message)
         {
             await message.AddReactionAsync(new Emoji(char.ConvertFromUtf32(0x1F44D)));
         }
-        public static async Task SendDenial(IMessage message)
+        public static async Task DenyMessage(IMessage message)
         {
             if (Emote.TryParse("<:frogthumbsdown:733751715098001509>", out var emote))
             {
@@ -88,11 +91,22 @@ namespace DiscordBot
             }
         }
 
-        public static async Task SendToModeratorChat(string message, SocketGuild guild)
+        private static async Task SendMessageToChannel(string message, SocketGuild guild, ulong channelId) 
         {
             Console.WriteLine(message);
-            var moderatorChannel = guild.GetTextChannel(592090738901254145);
-            await moderatorChannel.SendMessageAsync(message);
+            if(guild != null) 
+            {
+                var channel = guild.GetTextChannel(channelId);
+                if(channel != null) await channel.SendMessageAsync(message);
+            }
+        }
+        public static async Task SendLog(string message, SocketGuild guild) 
+        {
+            await SendMessageToChannel(message, guild, logChannelID);
+        }
+        public static async Task SendModerators(string message, SocketGuild guild)
+        {
+            await SendMessageToChannel(message, guild, moderatorChannelID);
         }
 
         public static async Task<IGuildUser> GetUserFromGuild(SocketGuild guild, SocketUser user)
@@ -102,7 +116,7 @@ namespace DiscordBot
             if (buddiesUser == null) //user isn't found in the guild
             {
                 var message = $"Couldn't get GuildUser for user: @{user}";
-                await SendToModeratorChat(message, guild);
+                await SendModerators(message, guild);
                 return null;
             }
 

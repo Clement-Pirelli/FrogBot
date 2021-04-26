@@ -19,7 +19,7 @@ namespace DiscordBot.Modules
 
             var requestOptions = new RequestOptions();
             requestOptions.AuditLogReason = reason;
-            Console.WriteLine(reason);
+            await Utilities.SendLog(reason, Context.Guild);
             var messagesRequest = Context.Channel.GetMessagesAsync(amount, options: requestOptions);
             await foreach (var messages in messagesRequest)
             {
@@ -41,7 +41,7 @@ namespace DiscordBot.Modules
         public async Task FlushLog() 
         {
             Console.Clear();
-            await Utilities.SendConfirmation(Context.Message); 
+            await Utilities.ConfirmMessage(Context.Message); 
         }
 
         [Command("reloadfiles")]
@@ -50,10 +50,11 @@ namespace DiscordBot.Modules
         {
             Program.emotesToRoleIds.Reload();
 
-            await Utilities.SendConfirmation(Context.Message);
+            await Utilities.ConfirmMessage(Context.Message);
         }
 
         [Command("getghosts")]
+        [RequireContext(ContextType.Guild)]
         [RequireUserPermission(ChannelPermission.ManageRoles)]
         public async Task GetGhosts() 
         {
@@ -63,26 +64,28 @@ namespace DiscordBot.Modules
             {
                 message += user.ToString() + " ";
             }
-            await Utilities.SendToModeratorChat(message, buddies);
+            await Utilities.SendModerators(message, buddies);
         }
 
         [Command("kickghosts")]
+        [RequireContext(ContextType.Guild)]
         [RequireUserPermission(ChannelPermission.ManageRoles)]
         public async Task KickGhosts() 
         {
-            await foreach(var user in Utilities.GetGhostsAndNoRoles(Utilities.BuddiesGuild(Context.Client)).ToAsyncEnumerable()) 
+            await foreach(var user in Utilities.GetGhostsAndNoRoles(Context.Guild).ToAsyncEnumerable()) 
             {
                 await user.KickAsync();
             }
         }
 
         [Command("say")]
+        [RequireContext(ContextType.Guild)]
         [RequireUserPermission(ChannelPermission.ManageMessages)]
         public async Task Say(string message)
         {
             await Context.Message.DeleteAsync();
             await Context.Channel.SendMessageAsync(message);
-            Console.WriteLine($"User {Context.User} said : \"" + message + "\"");
+            await Utilities.SendLog($"User { Context.User } said : \" { message } \" in channel #{ Context.Channel.Name }", Context.Guild);
         }
     }
 }
