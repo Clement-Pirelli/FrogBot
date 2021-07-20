@@ -12,6 +12,7 @@ namespace DiscordBot
         private const ulong buddiesId = 441370070711533588;
         private const ulong logChannelID = 836362119317422080;
         private const ulong moderatorChannelID = 592090738901254145;
+        public const ulong frogbotID = 721498761851043891;
 
         public static SocketGuild BuddiesGuild(DiscordSocketClient client) 
         {
@@ -29,8 +30,7 @@ namespace DiscordBot
                 }
 
                 //try to get the user
-                IGuildUser guildUser = null;
-                guildUser = user as IGuildUser;
+                IGuildUser guildUser = user as IGuildUser;
 
                 //if we're in DMs
                 if (guildUser == null)
@@ -49,11 +49,10 @@ namespace DiscordBot
                 SocketRole role, ghostRole;
                 ghostRole = buddiesGuild.GetRole(496632805820727298); //ghost role id
                 role = buddiesGuild.GetRole(roleId);
-
-
+                
                 if (guildUser.RoleIds.Contains(role.Id))
                 {
-                    Console.WriteLine($"Removed role {role.Name} from user {user}, id {user.Id}");
+                    await SendLog($"Removed role {role.Name} from user {user}, id {user.Id}", buddiesGuild);
                     await guildUser.RemoveRoleAsync(role); 
                     if (guildUser.RoleIds.Count == 2) //2 because the role we just removed + @everyone, which is a role... 
                         await guildUser.AddRoleAsync(ghostRole);
@@ -62,7 +61,7 @@ namespace DiscordBot
                 {
                     //remove ghost role if the user has it
                     if (guildUser.RoleIds.Contains(ghostRole.Id)) await guildUser.RemoveRoleAsync(ghostRole);
-                    Console.WriteLine($"Added role {role.Name} to user {user}, id {user.Id}");
+                    await SendLog($"Added role {role.Name} to user {user}, id {user.Id}", buddiesGuild);
                     await guildUser.AddRoleAsync(role);
                 }
 

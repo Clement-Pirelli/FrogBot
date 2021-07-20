@@ -109,25 +109,42 @@ namespace DiscordBot
 
         private async Task HandleReactionAsync(Cacheable<IUserMessage, ulong> cacheableMessage, ISocketMessageChannel channel, SocketReaction reaction, bool added)
         {
-            if (!reaction.User.IsSpecified || reaction.User.Value.IsBot) return;
-            
-            var user = reaction.User.Value;
-            
-            try {
-               
-                var roleId = emotesToRoleIds[reaction.Emote.Name];
-
-                var socketUser = user as SocketUser;
-                if (socketUser == null) return;
-
-                await Utilities.ToggleRole(client, socketUser, roleId);
-            } catch(KeyNotFoundException e) 
+            try
             {
-                if (added && channel.Id == roleSettingChannelId)
+                var message = await cacheableMessage.GetOrDownloadAsync();
+                if (message == null) return;
+
+                bool isFrogbot = (message.Author.Id == Utilities.frogbotID);
+                bool reactingUserIsBot = reaction.User.IsSpecified && reaction.User.Value.IsBot;
+                if (!isFrogbot || reactingUserIsBot) return;
+
+                var userid = reaction.UserId;
+                var socketUser = client.GetUser(userid);
+                if (socketUser == null)
                 {
-                    var message = await cacheableMessage.GetOrDownloadAsync();
-                    await message.RemoveReactionAsync(reaction.Emote, user);
+                    var buddiesGuild = Utilities.BuddiesGuild(client);
+                    var guilds = new List<SocketGuild> { buddiesGuild };
+                    await client.DownloadUsersAsync(guilds);
+                    socketUser = buddiesGuild.GetUser(userid);
                 }
+                if (socketUser == null) return;
+                try
+                {
+                    var roleId = emotesToRoleIds[reaction.Emote.Name];
+                    await Utilities.ToggleRole(client, socketUser, roleId);
+                }
+                catch (KeyNotFoundException e)
+                {
+                    if (added && channel.Id == roleSettingChannelId)
+                    {
+                        await message.RemoveReactionAsync(reaction.Emote, socketUser);
+                        await Log(e.Message);
+                        await Log($"Couldn't add role to user {socketUser}, emote was: {reaction.Emote.Name}");
+                    }
+                }
+            } catch(Exception e) 
+            {
+                await Log(e.Message);
             }
         }
 
@@ -141,6 +158,7 @@ namespace DiscordBot
                 if (ghostRole != null) 
                 {
                     await user.AddRoleAsync(ghostRole);
+                    await Utilities.SendLog($"Gave ghosts role to user {user}!", user.Guild);
                 } else
                 {
                     throw new Exception("Ghost role couldn't be found!");

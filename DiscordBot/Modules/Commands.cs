@@ -45,12 +45,19 @@ namespace DiscordBot.Modules
         }
 
         [Command("reloadfiles")]
+        [RequireContext(ContextType.Guild)]
         [RequireUserPermission(ChannelPermission.ManageChannels)]
         public async Task Reload() 
         {
             Program.emotesToRoleIds.Reload();
-
             await Utilities.ConfirmMessage(Context.Message);
+
+            var log = "Loaded key-value pairs are:\n";
+            foreach(var keyValuePair in Program.emotesToRoleIds.Data) 
+            {
+                log += $"{keyValuePair.Key} - {keyValuePair.Value}\n";
+            }
+            await Utilities.SendLog(log, Context.Guild);
         }
 
         [Command("getghosts")]
@@ -86,6 +93,32 @@ namespace DiscordBot.Modules
             await Context.Message.DeleteAsync();
             await Context.Channel.SendMessageAsync(message);
             await Utilities.SendLog($"User { Context.User } said : \" { message } \" in channel #{ Context.Channel.Name }", Context.Guild);
+        }
+
+        [Command("edit")]
+        [RequireContext(ContextType.Guild)]
+        [RequireUserPermission(ChannelPermission.ManageMessages)]
+        public async Task Edit(ulong messageId, string newMessage)
+        {
+            var message = await Context.Channel.GetMessagesAsync().Flatten().FirstAsync(x => x.Id == messageId);
+            var socketMessage = message as Discord.WebSocket.SocketUserMessage;
+            var restMessage = message as Discord.Rest.RestUserMessage;
+            if (socketMessage == null && restMessage == null) 
+            {
+                await Utilities.SendLog($"Couldn't find or edit message with ID {messageId}", Context.Guild);
+                await Context.Message.DeleteAsync();
+                return;
+            }
+            if (restMessage != null) 
+            {
+                await restMessage.ModifyAsync(x => x.Content = newMessage);
+            }
+            else
+            {
+                await socketMessage.ModifyAsync(x => x.Content = newMessage);
+            }
+            await Utilities.SendLog($"User { Context.User } modified message with ID {messageId} to say:\n \" { newMessage } \"", Context.Guild);
+            await Context.Message.DeleteAsync();
         }
     }
 }
